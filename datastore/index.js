@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const _ = require('underscore');
 const counter = require('./counter');
+const Promise = require('bluebird');
+const readFilePromise = Promise.promisify(fs.readFile);
 
 //fs.readfile
 //fs.writefile
@@ -29,20 +31,29 @@ exports.create = (text, callback) => { //counter.getNextUniqueID(err, filename) 
 
 exports.readAll = (callback) => {
   //'should return an empty array when there are no todos' using readfile?
-    //readfile(path (filename[options (headers?)], callback)
   //'should return an array with all saved todos'
-    //means we should save our todos within an array? where is our file system located? and how are they stored?
-  //'should find a todo by id'
-    //id is filename
+  fs.readdir(exports.dataDir, (err, files) => {
+    if (err) {
+      throw ('error');
+    }
+    var result = files.map((file) => {
+      let id = path.basename(file, '.txt');
+      let filePath = path.join(exports.dataDir, file);
 
-    //reading directory of data
-    // fs.readdir(path.join(exports.dataDir), (err, files) => {
-    //   //for each of the files within directory
-    //   var results = _.map(files, (file) => {
-    //     console.log('done')
-  //       //return all text data in array
-  //   });
-  // });
+      return readFilePromise(filePath, 'utf8')
+        .then(text => {
+          return {id: id, text: text};
+        });
+    });
+
+    Promise.all(result)
+      .then((items) => {
+        callback(null, items);
+      })
+      .catch((err) => {
+        callback(err);
+      });
+  });
 };
 
 exports.readOne = (id, callback) => {
@@ -84,44 +95,18 @@ exports.update = (id, text, callback) => {
     }
   });
 };
-  // console.log(`${exports.dataDir}`, 'this is dataDir');
-  // fs.access((pathway, err) => {
-  //   if (err) {
-  //     throw ('could not find pathway');
-  //   } else {
-  //     fs.writeFile(pathway, text, (err) => {
-  //       if (err) {
-  //         throw ('could not update, error');
-  //       } else {
-  //         callback(null, {id, text});
-  //       }
-  //     });
-  //     console.log(pathway, '\n\npathway after conditional');
-  //   }
-  // });
-    //when writing file, should use same ID
-  //'should update the todo text for existing todo'
-    //should only change the text
-  //'should not create a new todo for non-existant id'
 
-  //fs.writeFile
-
-
-
-  //find the item, what is it's directory/pathway X
 
 exports.delete = (id, callback) => {
-  //should not change the counter
-  //should delete todo file by id'
-  //'should return an error for non-existant id'
-  var item = items[id];
-  delete items[id];
-  if (!item) {
-    // report an error if item not found
-    callback(new Error(`No item with id: ${id}`));
-  } else {
-    callback();
-  }
+
+  let filePath = path.join(exports.dataDir, `${id}.txt`);
+  fs.unlink(filePath, (err) => {
+    if (err) {
+      callback(new Error(`No item with id: ${id}`));
+    } else {
+      callback(null);
+    }
+  });
 };
 
 // Config+Initialization code -- DO NOT MODIFY /////////////////////////////////
