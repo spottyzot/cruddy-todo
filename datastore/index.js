@@ -3,7 +3,7 @@ const path = require('path');
 const _ = require('underscore');
 const counter = require('./counter');
 const Promise = require('bluebird');
-const readFilePromise = Promise.promisify(fs.readFile);
+const fsp = Promise.promisifyAll(fs);
 
 //fs.readfile
 //fs.writefile
@@ -14,17 +14,18 @@ const readFilePromise = Promise.promisify(fs.readFile);
 
 exports.create = (text, callback) => { //counter.getNextUniqueID(err, filename) exports.create('delete this repo'); todo=00001
 //'should pass a todo object to the callback on success'
+  //getting unique id
   counter.getNextUniqueId((err, id) => { //arguments are now (err: null, id = obj of data)
-    console.log(path.join(exports.dataDir));
-
-
-    fs.writeFile(path.join(exports.dataDir, `${id}.txt`), text, (err) => { //fs.writeFile( file, data, options, callback )
-      if (err) { //checks for error
-        throw ('error, could not create new file');
-      } else { //issue callback with the new info, goes to line 15
+    //create pathway using the id
+    var pathway = path.join(exports.dataDir, `${id}.txt`);
+    //writefile async using pathway and text as our parameters
+    return fsp.writeFileAsync(pathway, text) //fs.writeFile( file, data, options, callback )
+      .then(() => {
         callback(null, {id: id, text: text});
-      }
-    });
+      })
+      .catch((err) => {
+        callback(err);
+      });
   });
 };
 
@@ -40,7 +41,7 @@ exports.readAll = (callback) => {
       let id = path.basename(file, '.txt');
       let filePath = path.join(exports.dataDir, file);
 
-      return readFilePromise(filePath, 'utf8')
+      return fsp.readFileAsync(filePath, 'utf8')
         .then(text => {
           return {id: id, text: text};
         });
@@ -56,45 +57,60 @@ exports.readAll = (callback) => {
   });
 };
 
-exports.readOne = (id, callback) => {
-  //'should return an error for non-existant todo'
-    //if the ID doesnt exist, throw err //fs.readFile(path[, options], callback)
-    //think i need to parse
-  fs.readFile(path.join(exports.dataDir, `${id}.txt`), 'utf8', (err, fileData) => {
-    if (err) {
-      callback(new Error(`No item with id:${id}` ));
-    } else {
-      callback(null, {id: id, text: fileData});
-    }
-  });
+exports.readOne = (id, callback) =>{
+  //
+  var pathway = path.join(exports.dataDir, `${id}.txt`);
+  return fsp.readFileAsync(pathway, 'utf8')
+
+    .then((text) => {
+      callback(null, {id: id, text: text});
+    })
+
+    .catch((err) => {
+      callback(new Error(`No item with id: ${id}`));
+    });
 };
 
 exports.update = (id, text, callback) => {
   //'should not change the counter'
   var pathway = path.join(exports.dataDir, `${id}.txt`);
-//readfile -> err / success
-  fs.readFile(pathway, 'utf8', (err, fileData) => {
-    //on error
-    if (err) {
-      //throw error
-      callback(new Error(`No item with id:${id}` ));
-      //on success
-    } else {
-      //writefile ->
-      fs.writeFile(pathway, text, (err) => {
-        //on error
-        if (err) {
-          //throw error
-          throw ('error, could not create new file');
-          //on success
-        } else {
-          //callback()
+
+  return fsp.readFileAsync(pathway, 'utf8')
+    .then(() => {
+      return fsp.writeFileAsync(pathway, text)
+        .then(() => {
           callback(null, {id: id, text: text});
-        }
-      });
-    }
-  });
+        });
+    })
+    .catch((err) => {
+      callback(new Error(`No item with id:${id}` ));
+    });
 };
+
+
+//readfile -> err / success
+  // fs.readFile(pathway, 'utf8', (err, fileData) => {
+  //   //on error
+  //   if (err) {
+  //     //throw error
+  //     callback(new Error(`No item with id:${id}` ));
+  //     //on success
+  //   } else {
+  //     //writefile ->
+  //     fs.writeFile(pathway, text, (err) => {
+  //       //on error
+  //       if (err) {
+  //         //throw error
+  //         throw ('error, could not create new file');
+  //         //on success
+  //       } else {
+  //         //callback()
+  //         callback(null, {id: id, text: text});
+  //       }
+  //     });
+  //   }
+  // });
+// };
 
 
 exports.delete = (id, callback) => {
